@@ -8,6 +8,17 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css">
 
     <style>
+         
+        body {
+            background: url(images/bg.png);
+        }
+        .mb-3, h3, h1, table th {
+        color: white; 
+        }
+        table td {
+                color: white; 
+        }
+    
         .container-account {
             height: 100vh;
             display: flex;
@@ -39,8 +50,8 @@
     <?php } ?>
 
 
+    <h1 style="text-align:center; display:flex; justify-content:center; align-items:center" class="mt-5">Burger Doe</h1>
     <div class="container-account">
-
         <div class="row">
             <div class="col-md-4">
                 <h3>Registration</h3>

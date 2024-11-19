@@ -17,6 +17,12 @@ if (!isset($_SESSION['userTemp']))
 }
 
 $isLoggedIn = isset($_SESSION['user_id']);
+$loggedInAsAdmin = isset($_SESSION['user_role']) && $_SESSION['user_role'] == "admin";
+
+if ($loggedInAsAdmin) {
+    header("Location: admin/index.php");
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
@@ -45,7 +51,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
                         <a href="#" class="bi bi-person-circle user-icon" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"></a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                             <?php if ($isLoggedIn): ?>
-                                <li><a class="dropdown-item" href="#">Suivi de commande</a></li>
+                                <li><a class="dropdown-item" href="suivi_commandes.php">Suivi de commande</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="deconnexion.php">Log out</a></li>
                             <?php else: ?>

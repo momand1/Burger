@@ -4,13 +4,14 @@ session_start();
 
 $db = Database::connect();
 
-// Determine the user identifier
+// Déterminer l'identifiant de l'utilisateur (session ou cookie temporaire)
 $userIdentifier = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : (isset($_COOKIE['userTemp']) ? $_COOKIE['userTemp'] : null);
 
+// Vérifier si l'utilisateur est identifié
 if (!$userIdentifier) {
-    // If there's no user identifier, the cart is empty
     $prodCart = [];
 } else {
+    // Récupérer les produits du panier
     $query = "SELECT p.*, i.name, i.image FROM panier p
               JOIN items i ON p.id_item = i.id 
               WHERE p.userTemp = :userIdentifier";
@@ -20,11 +21,26 @@ if (!$userIdentifier) {
     $prodCart = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Calculer le prix HT du panier
 $subtotalHT = array_sum(array_map(function($item) {
     return $item['prix'] * $item['qte'];
 }, $prodCart));
 
-$totalTTC = isset($_GET['newPrice']) ? $_GET['newPrice'] : $subtotalHT * 1.1;
+// Calculer la TVA (exemple : 10% de TVA)
+$TVA = $subtotalHT * 0.1;  // TVA à 10%
+$totalTTC = $subtotalHT + $TVA;  // Total TTC sans remise
+
+// Appliquer le coupon si défini
+$totalAvecRemise = $totalTTC;
+if (isset($_SESSION['coupon'])) {
+    $coupon = $_SESSION['coupon'];
+    if ($coupon['type'] == '%') {
+        $remise = $totalTTC * $coupon['remise'] / 100;
+    } elseif ($coupon['type'] == 'euros') {
+        $remise = $coupon['remise'];
+    }
+    $totalAvecRemise = $totalTTC - $remise;  // Total après remise
+}
 
 ?>
 <!DOCTYPE html>
@@ -34,12 +50,29 @@ $totalTTC = isset($_GET['newPrice']) ? $_GET['newPrice'] : $subtotalHT * 1.1;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panier</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <style>
+    body {
+        color: white;
+    }
+    table th {
+        color: white; 
+    }
+    table td {
+        color: white; 
+    }
+  
+</style>
+
+
 </head>
-<body>
-    <div class="container mt-5">
+<body style="background: url(images/bg.png);">
+    <div class="container mt-5" >
         <h1 class="mb-4">Panier</h1>
+        
+        <!-- Bouton retour -->
+        <a href="index.php" class="btn btn-secondary mb-3">Retour à l'accueil</a>
+
         <?php if (empty($prodCart)): ?>
             <div class="alert alert-danger" role="alert">
                 Votre panier est vide !
@@ -73,7 +106,7 @@ $totalTTC = isset($_GET['newPrice']) ? $_GET['newPrice'] : $subtotalHT * 1.1;
                             <td>
                                 <a href="removeItem.php?id=<?= $prod['id_item'] ?>" class="btn btn-danger btn-sm" 
                                    onclick="return confirm('Etes vous sur de vouloir supprimer ce produit ?')">
-                                    <i class="bi bi-trash"></i> Supprimer
+                                    Supprimer
                                 </a>
                             </td>
                         </tr>
@@ -81,119 +114,90 @@ $totalTTC = isset($_GET['newPrice']) ? $_GET['newPrice'] : $subtotalHT * 1.1;
                 </tbody>
             </table>
 
+            <!-- Formulaire pour appliquer un coupon -->
             <div class="row">
                 <div class="col-md-6">
-                    <h3>Avez vous un coupon?</h3>
+                    <h3>Appliquez un coupon</h3>
                     <form action="couponREQ.php" method="POST">
                         <div class="input-group mb-3">
-                            <input type="text" class="form-control" name="code" placeholder="Entrer le code de la remise">
-                            <input type="hidden" name="total" value="<?= $totalTTC ?>">
-                            <button class="btn btn-primary" type="submit">Valider</button>
+                            <input type="text" class="form-control" name="code" placeholder="Entrez votre code coupon" aria-label="Coupon">
+                            <input type="hidden" name="total" value="<?= number_format($totalTTC, 2) ?>">
+                            <button class="btn btn-primary" type="submit">Appliquer</button>
                         </div>
                     </form>
                     <?php if (isset($_GET['error'])): ?>
-                        <div class="alert alert-danger" role="alert">
-                            Attention : le code remise saisi est incorrect !
-                        </div>
-                    <?php endif; ?>
-                    <?php if (isset($_GET['newPrice'])): ?>
-                        <div class="alert alert-success" role="alert">
-                            Vous avez ajouté un code de réduction !
+                        <div class="alert alert-danger">
+                            <?php
+                            if ($_GET['error'] == 1) {
+                                echo "Coupon invalide.";
+                            } elseif ($_GET['error'] == 2) {
+                                echo "Type de remise incorrect.";
+                            } elseif ($_GET['error'] == 3) {
+                                echo "Requête invalide.";
+                            }
+                            ?>
                         </div>
                     <?php endif; ?>
                 </div>
-                <div class="col-md-6">
-                    <h3>Total panier</h3>
-                    <table class="table">
-                        <tr>
-                            <td>Total produit HT</td>
-                            <td id="subtotal"><?= number_format($subtotalHT, 2) ?> €</td>
-                        </tr>
-                        <tr>
-                            <td>TVA (10%)</td>
-                            <td id="vat"><?= number_format($subtotalHT * 0.1, 2) ?> €</td>
-                        </tr>
-                        <?php if (isset($_SESSION['coupon'])): ?>
-                            <tr>
-                                <td>Remise (<?= htmlspecialchars($_SESSION['coupon']['code']) ?>)</td>
-                                <td>-<span id="coupon-discount"><?= number_format($_SESSION['coupon']['montant'], 2) ?></span> €</td>
-                            </tr>
-                        <?php else: ?>
-                            <span id="coupon-discount" style="display:none;">0</span>
-                        <?php endif; ?>
-                        <tr>
-                            <td><strong>Total TTC</strong></td>
-                            <td id="total"><strong><?= number_format($totalTTC, 2) ?> €</strong></td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
 
-            <div class="mt-4">
-                <a href="index.php" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Continuer vos achats</a>
-                <a href="#" class="btn btn-primary">Procéder au paiement</a>
+                <div class="col-md-6 text-end">
+                    <h3>Détails du panier :</h3>
+                    <p><strong>Prix HT :</strong> <?= number_format($subtotalHT, 2) ?> €</p>
+                    <p><strong>TVA (10%) :</strong> <?= number_format($TVA, 2) ?> €</p>
+                    <p><strong>Total TTC :</strong> <?= number_format($totalTTC, 2) ?> €</p>
+                    <?php if (isset($remise)): ?>
+                        <p><strong>Remise appliquée :</strong> -<?= number_format($remise, 2) ?> €</p>
+                        <p><strong>Total avec remise :</strong> <?= number_format($totalAvecRemise, 2) ?> €</p>
+                    <?php else: ?>
+                        <p><strong>Total sans remise :</strong> <?= number_format($totalTTC, 2) ?> €</p>
+                        <?php endif; ?>
+                        <form action="ajouter_commande.php" method="POST">
+                    <button type="submit" class="btn btn-success">Finaliser ma commande</button>
+                </form>
+                </div>
             </div>
         <?php endif; ?>
     </div>
 
     <script>
-    $(document).ready(function() {
-        function updateQuantity(itemId, action) {
-            $.ajax({
-                url: 'updateQTE.php',
-                method: 'POST',
-                data: JSON.stringify({ id: itemId, action: action }),
-                contentType: 'application/json',
-                success: function(response) {
-                    var data = JSON.parse(response);
-                    var row = $('tr[data-id="' + itemId + '"]');
-                    row.find('.item-qty').val(data.qte);
-                    updateItemTotal(row);
-                    updateCartTotal();
-                },
-                error: function(xhr, status, error) {
-                    console.error("Error updating quantity:", error);
-                }
+        $(document).ready(function() {
+            // Fonction d'update de la quantité d'article
+            $('.increase-qty').click(function() {
+                var itemId = $(this).closest('tr').data('id');
+                updateQuantity(itemId, 'increase');
             });
-        }
 
-        function updateItemTotal(row) {
-            var price = parseFloat(row.find('.price').text());
-            var quantity = parseInt(row.find('.item-qty').val());
-            var total = price * quantity;
-            row.find('.item-total').text(total.toFixed(2) + ' €');
-        }
-
-        function updateCartTotal() {
-            var subtotal = 0;
-            $('.item-total').each(function() {
-                subtotal += parseFloat($(this).text());
+            $('.decrease-qty').click(function() {
+                var itemId = $(this).closest('tr').data('id');
+                updateQuantity(itemId, 'decrease');
             });
-            var vat = subtotal * 0.1;
-            var total = subtotal + vat;
 
-            // Check if a coupon is applied
-            var couponDiscount = parseFloat($('#coupon-discount').text()) || 0;
-            total -= couponDiscount;
+            function updateQuantity(itemId, action) {
+                $.ajax({
+                    url: 'updateQTE.php',
+                    method: 'POST',
+                    data: { id: itemId, action: action },
+                    success: function(response) {
+                        var data = JSON.parse(response);
+                        if (data.success) {
+                            var row = $('tr[data-id="' + itemId + '"]');
+                            var newQty = data.newQuantity;
+                            row.find('.item-qty').val(newQty);
+                            row.find('.item-total').text(data.newTotal + ' €');
 
-            $('#subtotal').text(subtotal.toFixed(2) + ' €');
-            $('#vat').text(vat.toFixed(2) + ' €');
-            $('#total').text(total.toFixed(2) + ' €');
+                            var total = 0;
+                            $('.item-total').each(function() {
+                                total += parseFloat($(this).text());
+                            });
 
-            // Update the hidden input for the coupon form
-            $('input[name="total"]').val(total.toFixed(2));
-        }
-
-        $('.increase-qty').click(function() {
-            var itemId = $(this).closest('tr').data('id');
-            updateQuantity(itemId, 'increase');
+                            $('#total').text(total.toFixed(2) + ' €');
+                        }
+                    }
+                });
+            }
         });
-
-        $('.decrease-qty').click(function() {
-            var itemId = $(this).closest('tr').data('id');
-            updateQuantity(itemId, 'decrease');
-        });
-    });
     </script>
+    <!-- À la fin du panier, ajoutez ce bouton -->
+
 </body>
 </html>

@@ -2,8 +2,8 @@
 // session_start();
 
 
-require 'verifRole.php';
 require '../db.php';
+require 'verifRole.php';
 
 $db = DataBase::connect();
 
@@ -19,9 +19,6 @@ ON items.category = categories.id";
 $stmt = $db->prepare($query);
 $stmt->execute();
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-
 ?>
 
 
@@ -42,7 +39,20 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </head>
 
     <body>
-        <h1 class="text-logo"> Burger Code </h1>
+    <div style="text-align:center; display:flex; justify-content:center; align-items:center" class="text-logo">
+                <h1>Burger Doe</h1>
+                <div class="icon-container">
+                    <div class="dropdown">
+                        <a href="#" class="bi bi-person-circle user-icon" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"></a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                           
+                                <li><a class="dropdown-item" href="gestion_commande.php">Gestion de commande</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="deconnexion.php">Log out</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         <div class="container admin">
             <div class="row">
                 <h1><strong>Liste des items   </strong><a href="insert.php" class="btn btn-success btn-lg"><span class="bi-plus"></span> Ajouter</a></h1>
